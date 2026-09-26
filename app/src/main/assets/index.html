@@ -1,0 +1,865 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Huemate</title>
+<style>
+/* Fonts ship inside the app, so they always load, even offline. */
+@font-face{font-family:"Gloock";src:url(fonts/Gloock-Regular.ttf) format("truetype");font-display:block}
+@font-face{font-family:"Nothing You Could Do";src:url(fonts/NothingYouCouldDo-Regular.ttf) format("truetype");font-display:block}
+@font-face{font-family:"Poppins";src:url(fonts/Poppins-Regular.ttf) format("truetype");font-weight:400;font-display:block}
+@font-face{font-family:"Poppins";src:url(fonts/Poppins-Medium.ttf) format("truetype");font-weight:500 600;font-display:block}
+@font-face{font-family:"Poppins";src:url(fonts/Poppins-Bold.ttf) format("truetype");font-weight:700 900;font-display:block}
+@font-face{font-family:"DM Mono";src:url(fonts/DMMono-Regular.ttf) format("truetype");font-display:block}
+/* Sticker-book look: chunky outlines and offset shadows. Surfaces stay near-neutral
+   so they never tint the colours you're judging; the one pop colour is for actions. */
+:root{
+  --bg:#F5F3FA; --panel:#FFFFFF; --sunk:#ECE8F6; --ink:#1B1830; --ink2:#4E4966; --ink3:#8B86A3;
+  --edge:#1B1830; --drop:#1B1830; --pop:#FFD84D; --pop-ink:#1B1830;
+  --like:#12A366; --nope:#E5484D; --good:#12A366; --ok:#C98A0B; --bad:#E5484D;
+  --display:"Gloock",Georgia,"Times New Roman",serif;
+  --hand:"Nothing You Could Do","Poppins",cursive;
+  --body:"Poppins",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"DM Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;
+  --bg:#15131E;--panel:#211E2E;--sunk:#2B2740;--ink:#F3F1FA;--ink2:#BFBAD6;--ink3:#827D9C;
+  --edge:#4A4466;--drop:#000000;--like:#3CCB8A;--nope:#FF6B6B;--good:#3CCB8A;--ok:#F2BC4E;--bad:#FF6B6B;}}
+:root[data-theme="dark"]{color-scheme:dark;
+  --bg:#15131E;--panel:#211E2E;--sunk:#2B2740;--ink:#F3F1FA;--ink2:#BFBAD6;--ink3:#827D9C;
+  --edge:#4A4466;--drop:#000000;--like:#3CCB8A;--nope:#FF6B6B;--good:#3CCB8A;--ok:#F2BC4E;--bad:#FF6B6B;}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{min-height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--body);font-weight:500;-webkit-font-smoothing:antialiased;
+  padding:env(safe-area-inset-top,0px) 16px calc(96px + env(safe-area-inset-bottom,0px))}
+.wrap{max-width:540px;margin:0 auto;display:flex;flex-direction:column;gap:18px;padding-block:16px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+h1{font:400 34px/1 var(--display);margin:0;letter-spacing:-.01em;display:flex;align-items:center;gap:9px}
+.dots{display:inline-grid;grid-template-columns:repeat(2,11px);gap:3px}
+.dots i{width:11px;height:11px;border-radius:50%;border:2px solid var(--edge)}
+h2{font:400 27px/1.12 var(--display);margin:0;letter-spacing:-.01em}
+h3{font:700 16px/1.3 var(--body);margin:0}
+.eyebrow{font:400 20px/1.1 var(--hand);color:var(--ink2);transform:rotate(-1.5deg);display:inline-block}
+.muted{color:var(--ink3)}
+.mono{font-family:var(--mono);font-size:12.5px}
+.card{background:var(--panel);border:2px solid var(--edge);border-radius:20px;box-shadow:3px 3px 0 var(--drop)}
+button{font-family:var(--body);cursor:pointer;color:inherit}
+button:focus-visible,input:focus-visible{outline:3px solid var(--pop);outline-offset:2px}
+.btn{border:2px solid var(--edge);border-radius:14px;background:var(--panel);color:var(--ink);font:800 15px var(--body);padding:10px 16px;
+  box-shadow:3px 3px 0 var(--drop);display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:transform .08s,box-shadow .08s}
+.btn:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--drop)}
+.btn.pop{background:var(--pop);color:var(--pop-ink);border-color:var(--pop-ink)}
+.btn.small{padding:6px 11px;font-size:13.5px;border-radius:11px;box-shadow:2px 2px 0 var(--drop)}
+.btn.wide{width:100%;padding:13px}
+.btn svg{width:18px;height:18px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spacer{flex:1}
+
+/* scan */
+.stage{position:relative;width:100%;aspect-ratio:4/5;max-height:54vh;border-radius:24px;overflow:hidden;background:#111;border:2px solid var(--edge);box-shadow:4px 4px 0 var(--drop)}
+.stage video,.stage canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.stage canvas{object-fit:contain;background:#111}
+.reticle{position:absolute;left:50%;top:50%;width:70px;height:70px;margin:-35px 0 0 -35px;border-radius:50%;border:4px dashed #fff;pointer-events:none;animation:spin 12s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.marker{position:absolute;width:42px;height:42px;margin:-21px 0 0 -21px;border-radius:50%;border:4px solid #fff;box-shadow:0 0 0 2px #000;pointer-events:none}
+.stagemsg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#eee;text-align:center;padding:24px}
+.hint{position:absolute;left:12px;right:12px;top:12px;text-align:center}
+.hint span{display:inline-block;background:#fff;color:#1B1830;font-size:12.5px;font-weight:800;padding:5px 11px;border-radius:999px;border:2px solid #1B1830}
+.controls{position:absolute;left:12px;right:12px;bottom:14px;display:flex;align-items:center;justify-content:space-between}
+.pill{border:2px solid #1B1830;border-radius:999px;background:#fff;color:#1B1830;font:800 14px var(--body);padding:8px 13px;display:inline-flex;gap:6px;align-items:center;box-shadow:2px 2px 0 #1B1830}
+.pill svg{width:17px;height:17px}
+.shutter{width:70px;height:70px;border-radius:50%;border:3px solid #1B1830;background:var(--pop);box-shadow:3px 3px 0 #1B1830;padding:0}
+.shutter:active{transform:translate(3px,3px);box-shadow:none}
+.current{padding:12px;display:flex;align-items:center;gap:12px}
+.bigsw{width:62px;height:62px;border-radius:16px;flex:none;border:2px solid var(--edge)}
+.current .info{flex:1;min-width:0}
+.current .name{font:700 19px/1.2 var(--body)}
+.palette{display:flex;gap:8px}
+.palette button{flex:1;height:54px;border:2px solid var(--edge);border-radius:14px;position:relative;padding:0}
+.palette button[aria-pressed="true"]{box-shadow:0 0 0 3px var(--pop),3px 3px 0 5px var(--drop)}
+.palette button span{position:absolute;left:0;right:0;bottom:-21px;font:500 11px var(--mono);color:var(--ink3)}
+.printbar{padding:12px;display:flex;gap:10px;align-items:center}
+.printbar .t{flex:1;font-size:14px}
+.toggle{width:52px;height:30px;border-radius:999px;border:2px solid var(--edge);background:var(--sunk);position:relative;padding:0;flex:none}
+.toggle::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--ink);transition:left .15s}
+.toggle[aria-checked="true"]{background:var(--pop)}
+.toggle[aria-checked="true"]::after{left:25px;background:#1B1830}
+.sugg{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:10px}
+.sw{background:var(--panel);border:2px solid var(--edge);border-radius:14px;box-shadow:2px 2px 0 var(--drop);overflow:hidden;display:flex;flex-direction:column;padding:0;text-align:left}
+.sw i{display:block;height:54px;border-bottom:2px solid var(--edge)}
+.sw b{font-size:13px;padding:6px 9px 0;line-height:1.2;font-weight:800}
+.sw small{font:500 10.5px var(--mono);color:var(--ink3);padding:1px 9px 7px}
+.group{display:flex;flex-direction:column;gap:8px}
+.group p{margin:0;font:400 17.5px/1.3 var(--hand);color:var(--ink2)}
+.note{font-size:14px;background:var(--sunk);border-radius:14px;padding:10px 12px;border:2px dashed var(--edge)}
+
+/* swipe */
+.base{padding:12px;display:flex;align-items:center;gap:12px}
+.chipsw{width:48px;height:48px;border-radius:14px;border:2px solid var(--edge);flex:none}
+.deck{position:relative;height:min(470px,62vh)}
+.scard{position:absolute;inset:0;background:var(--panel);border:2px solid var(--edge);border-radius:26px;box-shadow:5px 5px 0 var(--drop);
+  display:flex;flex-direction:column;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;will-change:transform}
+.scard.back{transform:scale(.94) translateY(14px);box-shadow:none;opacity:.9}
+.scard .fig{flex:1;display:grid;place-items:center;background:var(--sunk);border-bottom:2px solid var(--edge);position:relative;min-height:0}
+.scard .fig svg{height:92%;max-height:300px}
+.scard .meta{padding:12px 16px 14px;display:flex;flex-direction:column;gap:6px}
+.scard .pieces{display:flex;flex-direction:column;gap:3px;font-size:14.5px}
+.scard .pieces span{display:flex;gap:8px;align-items:center}
+.scard .pieces i{width:16px;height:16px;border-radius:5px;border:2px solid var(--edge);flex:none}
+.scard .why,.hand{font:400 18.5px/1.35 var(--hand);color:var(--ink2);margin:0}
+.tagrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.tag{font:800 12px var(--body);padding:3px 9px;border-radius:999px;border:2px solid var(--edge);background:var(--panel)}
+.tag.score{background:var(--pop);color:var(--pop-ink);border-color:var(--pop-ink);font:800 13px var(--body)}
+.stamp{position:absolute;top:18px;font:400 32px/1 var(--display);letter-spacing:.04em;padding:4px 12px;border:4px solid;border-radius:12px;opacity:0;pointer-events:none;background:rgba(255,255,255,.8)}
+.stamp.like{left:18px;color:var(--like);transform:rotate(-12deg)}
+.stamp.nope{right:18px;color:var(--nope);transform:rotate(12deg)}
+.swipebtns{display:flex;justify-content:center;align-items:center;gap:22px}
+.round{width:66px;height:66px;border-radius:50%;border:2px solid var(--edge);background:var(--panel);box-shadow:3px 3px 0 var(--drop);display:grid;place-items:center;padding:0}
+.round svg{width:30px;height:30px}
+.round.nope{color:var(--nope)} .round.like{color:var(--like)}
+.round.undo{width:46px;height:46px}
+.round.undo svg{width:20px;height:20px}
+.round:active{transform:translate(3px,3px);box-shadow:none}
+.progress{height:8px;border-radius:9px;background:var(--sunk);border:2px solid var(--edge);overflow:hidden}
+.progress i{display:block;height:100%;background:var(--pop);transition:width .25s}
+.likes{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.mini{background:var(--panel);border:2px solid var(--edge);border-radius:18px;box-shadow:3px 3px 0 var(--drop);padding:0;overflow:hidden;text-align:left;display:flex;flex-direction:column}
+.mini .fig{height:150px;display:grid;place-items:center;background:var(--sunk);border-bottom:2px solid var(--edge)}
+.mini .fig svg{height:90%}
+.mini div.t{padding:8px 10px 10px;font-size:13px;line-height:1.3}
+.mini[aria-pressed="true"]{box-shadow:0 0 0 4px var(--pop),4px 4px 0 5px var(--drop)}
+.final{padding:0;overflow:hidden}
+.final .fig{height:320px;display:grid;place-items:center;background:var(--pop);border-bottom:2px solid var(--edge)}
+.final .fig svg{height:92%}
+.final .meta{padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+
+/* closet */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:12px}
+.item{background:var(--panel);border:2px solid var(--edge);border-radius:18px;box-shadow:3px 3px 0 var(--drop);padding:0;overflow:hidden;text-align:left;display:flex;flex-direction:column}
+.item i{display:block;height:88px;position:relative;border-bottom:2px solid var(--edge)}
+.item i em{position:absolute;right:7px;top:7px;font:800 10.5px var(--body);font-style:normal;letter-spacing:.05em;text-transform:uppercase;background:#fff;color:#1B1830;border:2px solid #1B1830;border-radius:999px;padding:1px 7px}
+.item b{font-size:15px;padding:8px 11px 0;font-weight:800}
+.item small{font-size:12.5px;color:var(--ink3);padding:0 11px 10px}
+.looks{display:flex;gap:12px;overflow-x:auto;padding:2px 4px 8px 2px;margin:0 -16px;padding-left:16px;scrollbar-width:none}
+.looks::-webkit-scrollbar{display:none}
+.look{flex:none;width:120px;background:var(--panel);border:2px solid var(--edge);border-radius:16px;box-shadow:3px 3px 0 var(--drop);overflow:hidden;padding:0}
+.look .fig{height:120px;display:grid;place-items:center;background:var(--sunk);border-bottom:2px solid var(--edge)}
+.look .fig svg{height:90%}
+.look small{display:block;padding:5px 8px 7px;font-size:12px;text-align:left}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:2px solid var(--edge);border-radius:999px;background:var(--panel);padding:5px 12px;font:800 13.5px var(--body)}
+.chip[aria-pressed="true"]{background:var(--pop);color:var(--pop-ink);border-color:var(--pop-ink)}
+.empty{text-align:center;color:var(--ink3);padding:36px 12px}
+
+/* pair */
+.pair{padding:16px;display:grid;grid-template-columns:120px 1fr;gap:16px;align-items:center}
+@media (max-width:370px){.pair{grid-template-columns:1fr}}
+.bigscore{display:flex;align-items:baseline;gap:6px}
+.bigscore .n{font:400 60px/1 var(--display)}
+.slots{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.slot{padding:9px;display:flex;gap:9px;align-items:center;text-align:left;min-width:0}
+.slot div{min-width:0}
+.slot b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot small{font-size:12px;color:var(--ink3)}
+
+/* sheet */
+.scrim{position:fixed;inset:0;background:rgba(20,16,40,.45);z-index:8}
+.sheet{position:fixed;left:0;right:0;bottom:0;max-height:86vh;overflow-y:auto;background:var(--bg);border-top:2px solid var(--edge);border-radius:26px 26px 0 0;z-index:9;
+  padding:10px 16px calc(22px + env(safe-area-inset-bottom,0px));animation:up .22s ease}
+.sheet .inner{max-width:540px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.grab{width:44px;height:6px;border-radius:9px;background:var(--edge);margin:2px auto 4px;opacity:.5}
+@keyframes up{from{transform:translateY(40px)}}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-weight:800;font-size:14px}
+.field input[type=text]{border:2px solid var(--edge);border-radius:14px;background:var(--panel);color:var(--ink);padding:11px 13px;font:600 16px var(--body)}
+.list{display:flex;flex-direction:column;gap:8px}
+.li{display:flex;gap:11px;align-items:center;padding:9px 11px;text-align:left;width:100%}
+.li .t{flex:1;min-width:0}
+.li .t b{display:block;font-size:15px}
+.li .t small{font-size:12.5px;color:var(--ink3)}
+.li .s{font:400 20px var(--display)}
+.colpick{display:flex;gap:8px;flex-wrap:wrap}
+.colpick button{width:52px;height:52px;border-radius:14px;border:2px solid var(--edge);padding:0;position:relative}
+.colpick button[aria-pressed="true"]::after{content:"✓";position:absolute;right:-7px;top:-7px;width:22px;height:22px;border-radius:50%;background:var(--pop);color:#1B1830;border:2px solid #1B1830;font:800 12px/18px var(--body);text-align:center}
+.colpick button[aria-pressed="false"]{opacity:.45}
+input[type=color]{width:48px;height:40px;border:0;background:none;padding:0}
+
+/* nav */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:2px solid var(--edge);padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px));display:flex;justify-content:center;gap:6px;z-index:5}
+nav.tabs button{flex:1;max-width:120px;border:2px solid transparent;background:transparent;color:var(--ink3);padding:6px 4px;border-radius:14px;font:800 12.5px var(--body);display:flex;flex-direction:column;align-items:center;gap:2px}
+nav.tabs button svg{width:22px;height:22px}
+nav.tabs button[aria-selected="true"]{color:var(--pop-ink);background:var(--pop);border-color:var(--pop-ink)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:14px;font-weight:800;font-size:14.5px;z-index:10;max-width:calc(100% - 32px)}
+section{animation:pop .22s ease}
+@keyframes pop{from{opacity:.3;transform:translateY(6px)}}
+@media (prefers-reduced-motion:reduce){section,.sheet{animation:none}.reticle{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="dots" aria-hidden="true"><i style="background:#FFD84D"></i><i style="background:#E5484D"></i><i style="background:#0F6E82"></i><i style="background:#D1287A"></i></span>Huemate</h1>
+    <button class="btn small" id="shareBtn" hidden>Share</button>
+  </header>
+
+  <!-- SCAN -->
+  <section id="vScan">
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="stage" id="stage">
+        <video id="video" playsinline muted autoplay></video>
+        <canvas id="frozen" hidden></canvas>
+        <div class="reticle" id="reticle"></div>
+        <div class="marker" id="marker" hidden></div>
+        <div class="hint"><span id="hintText">Point at the fabric · daylight is best</span></div>
+        <div class="stagemsg" id="stageMsg" hidden></div>
+        <div class="controls">
+          <button class="pill" id="photoBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>Photo</button>
+          <button class="shutter" id="shutter" aria-label="Capture colours"></button>
+          <button class="pill" id="liveBtn" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Live</button>
+          <span style="width:92px" id="shutterPad"></span>
+        </div>
+        <input type="file" id="file" accept="image/*" hidden>
+      </div>
+
+      <div class="card current">
+        <div class="bigsw" id="curSw"></div>
+        <div class="info"><div class="name" id="curName">—</div><div class="mono muted" id="curHex"></div></div>
+        <button class="btn pop small" id="saveBtn">Save</button>
+      </div>
+
+      <div id="paletteSec" hidden style="display:flex;flex-direction:column;gap:10px">
+        <span class="eyebrow">Colours in this photo</span>
+        <div class="palette" id="palette" style="margin-bottom:20px"></div>
+        <div class="card printbar" id="printBar">
+          <div class="t"><b id="printTitle">Is this a print?</b><br><span class="muted" id="printSub">Turn on to match all its colours together.</span></div>
+          <button class="toggle" id="printToggle" role="switch" aria-checked="false" aria-label="Multi-colour piece"></button>
+        </div>
+      </div>
+
+      <button class="btn pop wide" id="swipeFromScan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><rect x="6" y="3" width="12" height="18" rx="3"/><path d="M2 9l2 3-2 3M22 9l-2 3 2 3"/></svg>Swipe outfit ideas for this</button>
+
+      <div id="suggSec" style="display:flex;flex-direction:column;gap:16px"></div>
+    </div>
+  </section>
+
+  <!-- SWIPE -->
+  <section id="vSwipe" hidden>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div id="swStart">
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div><h2>Swipe your outfit</h2><p class="hand" style="margin:4px 0 0">Right for looks you love, left to skip. Then pick your final one.</p></div>
+          <span class="eyebrow">Styling</span>
+          <button class="card base" id="baseBtn"><span class="chipsw" id="baseSw"></span><span style="flex:1;text-align:left"><b id="baseName" style="font-size:17px"></b><br><small class="muted" id="baseSub"></small></span><span class="btn small">Change</span></button>
+          <button class="btn pop wide" id="startSwipe">Start swiping</button>
+        </div>
+      </div>
+      <div id="swDeck" hidden>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="row"><b id="deckTitle" style="flex:1;min-width:0"></b><span class="mono muted" id="deckCount"></span></div>
+          <div class="progress"><i id="deckBar" style="width:0"></i></div>
+          <div class="deck" id="deck"></div>
+          <div class="swipebtns">
+            <button class="round nope" id="nopeBtn" aria-label="Skip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+            <button class="round undo" id="undoBtn" aria-label="Undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
+            <button class="round like" id="likeBtn" aria-label="Like"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7.5-4.6-9.5-9.3C1.2 8.4 3.3 5 6.8 5c2 0 3.5 1.1 4.2 2.4h2C13.7 6.1 15.2 5 17.2 5c3.5 0 5.6 3.4 4.3 6.7C19.5 16.4 12 21 12 21z"/></svg></button>
+          </div>
+        </div>
+      </div>
+      <div id="swLikes" hidden>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div><h2 id="likesTitle"></h2><p class="hand" style="margin:4px 0 0" id="likesSub"></p></div>
+          <div class="likes" id="likesGrid"></div>
+          <button class="btn pop wide" id="finalBtn" disabled>Make it my final look</button>
+          <button class="btn wide" id="againBtn">Swipe a new set</button>
+        </div>
+      </div>
+      <div id="swFinal" hidden>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <span class="eyebrow">Your final look</span>
+          <div class="card final" id="finalCard"></div>
+          <div class="row"><button class="btn pop" id="saveLook" style="flex:1">Save look</button><button class="btn" id="shareLook" style="flex:1">Share</button></div>
+          <button class="btn wide" id="restartBtn">Style something else</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CLOSET -->
+  <section id="vCloset" hidden>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div id="looksWrap" hidden style="display:flex;flex-direction:column;gap:10px">
+        <h2>Saved looks</h2>
+        <div class="looks" id="looks"></div>
+      </div>
+      <div class="row"><h2 style="flex:1">Your closet</h2><span class="muted" id="wCount"></span></div>
+      <div class="chips" id="wFilter"></div>
+      <div class="grid" id="wGrid"></div>
+      <p class="muted" style="font-size:13.5px;margin:0">Scan a piece and tap Save to add it. Prints keep all their colours.</p>
+    </div>
+  </section>
+
+  <!-- PAIR -->
+  <section id="vPair" hidden>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <h2>Do these go together?</h2>
+      <div class="slots">
+        <button class="card slot" data-slot="a"><span class="chipsw" id="aSw"></span><div><b id="aName"></b><small>Top</small></div></button>
+        <button class="card slot" data-slot="b"><span class="chipsw" id="bSw"></span><div><b id="bName"></b><small>Bottom</small></div></button>
+      </div>
+      <div class="card pair">
+        <div id="pFig"></div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="bigscore"><span class="n" id="pScore">0</span><span class="muted">/ 100</span></div>
+          <span class="tag" id="pLabel" style="align-self:flex-start"></span>
+          <p class="hand" id="pWhy"></p>
+        </div>
+      </div>
+      <div class="note" id="pTip"></div>
+      <button class="btn wide" id="swapBtn">Swap top and bottom</button>
+    </div>
+  </section>
+</div>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" data-tab="Scan" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.5"/></svg>Scan</button>
+  <button role="tab" data-tab="Swipe" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><rect x="6" y="3" width="12" height="18" rx="3"/><path d="M2 9l2 3-2 3M22 9l-2 3 2 3"/></svg>Swipe</button>
+  <button role="tab" data-tab="Closet" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5a2 2 0 1 1 2 2c-1 0-2 .6-2 1.6V9L3.5 15.5A1.4 1.4 0 0 0 4.4 18h15.2a1.4 1.4 0 0 0 .9-2.5L12 9"/></svg>Closet</button>
+  <button role="tab" data-tab="Pair" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="9" cy="12" r="6"/><circle cx="15" cy="12" r="6"/></svg>Pair</button>
+</nav>
+<div id="sheetHost"></div>
+<div class="toast" id="toast" hidden></div>
+<script>
+/* ================= colour science ================= */
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function hexToRgb(h){h=h.replace("#","");return[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
+function rgbToHex(r,g,b){return"#"+[r,g,b].map(v=>clamp(Math.round(v),0,255).toString(16).padStart(2,"0")).join("").toUpperCase();}
+const lin=c=>{c/=255;return c<=0.04045?c/12.92:Math.pow((c+0.055)/1.055,2.4);};
+const unlin=c=>255*(c<=0.0031308?12.92*c:1.055*Math.pow(c,1/2.4)-0.055);
+function rgbToLab(r,g,b){
+  const R=lin(r),G=lin(g),B=lin(b);
+  const x=(0.4124*R+0.3576*G+0.1805*B)/0.95047,y=0.2126*R+0.7152*G+0.0722*B,z=(0.0193*R+0.1192*G+0.9505*B)/1.08883;
+  const f=t=>t>0.008856?Math.cbrt(t):7.787*t+16/116;
+  const fx=f(x),fy=f(y),fz=f(z);
+  return[116*fy-16,500*(fx-fy),200*(fy-fz)];
+}
+function labToRgbRaw(L,a,b){
+  const fy=(L+16)/116,fx=a/500+fy,fz=fy-b/200;
+  const fi=t=>t*t*t>0.008856?t*t*t:(t-16/116)/7.787;
+  const x=fi(fx)*0.95047,y=fi(fy),z=fi(fz)*1.08883;
+  return[3.2406*x-1.5372*y-0.4986*z,-0.9689*x+1.8758*y+0.0415*z,0.0557*x-0.2040*y+1.0570*z];
+}
+function toLch(hex){const[L,a,b]=rgbToLab(...hexToRgb(hex));let h=Math.atan2(b,a)*180/Math.PI;if(h<0)h+=360;return{L,C:Math.hypot(a,b),h};}
+function fromLch(L,C,h){
+  // shrink chroma until the colour fits in sRGB
+  for(let c=C;c>=0;c-=1){
+    const hr=h*Math.PI/180,rgb=labToRgbRaw(L,c*Math.cos(hr),c*Math.sin(hr));
+    if(rgb.every(v=>v>=-0.001&&v<=1.001))return rgbToHex(...rgb.map(v=>unlin(clamp(v,0,1))));
+  }
+  const g=unlin(clamp(labToRgbRaw(L,0,0)[1],0,1));return rgbToHex(g,g,g);
+}
+const dE=(p,q)=>Math.hypot(p[0]-q[0],p[1]-q[1],p[2]-q[2]);
+
+/* Colour names people actually use when shopping for clothes in India */
+const NAMES=[["Black","#1C1C1E"],["Charcoal","#36454F"],["Grey","#8E8E93"],["Silver","#C4C4C8"],["White","#F8F8F6"],["Off-white","#EFEBE0"],["Cream","#F1E4C8"],["Beige","#D8C3A5"],["Camel","#C19A6B"],["Khaki","#BDB38B"],["Brown","#6B4226"],["Chocolate","#3F2A1D"],["Rust","#B7410E"],["Terracotta","#C8643B"],["Brick red","#9C3A2B"],["Red","#C8102E"],["Maroon","#7A1F2B"],["Wine","#6D1A36"],["Coral","#F88379"],["Peach","#F6C1A3"],["Blush pink","#E8B7B5"],["Baby pink","#F4C2C2"],["Rani pink","#D1287A"],["Fuchsia","#C21E80"],["Mauve","#B784A7"],["Lavender","#B9A7D6"],["Purple","#6A3D9A"],["Plum","#5E2750"],["Indigo","#2E3A87"],["Navy","#1F2A44"],["Royal blue","#2A52BE"],["Denim","#3B5B8C"],["Sky blue","#87B8DE"],["Powder blue","#B0CFE3"],["Teal","#1F7A7A"],["Peacock blue","#0F6E82"],["Turquoise","#3FC1C0"],["Mint","#A8D8B9"],["Sage","#9CAF88"],["Mehendi green","#6E7F3A"],["Olive","#6B6B2E"],["Bottle green","#0B5345"],["Emerald","#1F8A5B"],["Parrot green","#5DBB3F"],["Lime","#BFD641"],["Mustard","#D4A017"],["Haldi yellow","#E3B505"],["Lemon","#F3E36B"],["Saffron","#F28C28"],["Orange","#E86A1C"],["Gold","#C9A43B"]]
+  .map(([n,h])=>({n,h,lab:rgbToLab(...hexToRgb(h))}));
+function nameOf(hex){const l=rgbToLab(...hexToRgb(hex));let best=NAMES[0],d=1e9;for(const c of NAMES){const e=dE(l,c.lab);if(e<d){d=e;best=c;}}return best.n;}
+const NEUTRALS=["#1C1C1E","#36454F","#8E8E93","#F8F8F6","#EFEBE0","#D8C3A5","#C19A6B","#1F2A44","#3B5B8C"];
+
+/* Does A go with B? Returns a score out of 100, a label and a plain reason. */
+function match(hexA,hexB){
+  const A=toLch(hexA),B=toLch(hexB);
+  const nA=A.C<14,nB=B.C<14,dL=Math.abs(A.L-B.L);
+  let d=Math.abs(A.h-B.h);if(d>180)d=360-d;
+  let s,label,why;
+  if(nA&&nB){s=dL>=25?82:dL>=12?70:58;label="Neutral pair";why=dL>=25?"Two neutrals with clear contrast: calm and easy to wear.":"Two very similar neutrals can look flat. Add a coloured accent.";}
+  else if(nA||nB){s=dL>=20?92:78;label="Neutral + colour";why="The neutral lets the colour lead. Almost always safe.";}
+  else{
+    const bright=A.C>55&&B.C>55;
+    if(d<18){s=dL>=18?84:60;label="Tone on tone";why=dL>=18?"The same colour family in different depths looks deliberate.":"Almost the same shade, so it can look like a near-miss. Go clearly lighter or darker.";}
+    else if(d<50){s=86;label="Analogous";why="Neighbours on the colour wheel blend smoothly.";}
+    else if(d<100){const muted=Math.min(A.C,B.C)<35;s=muted?72:50;label=muted?"Works, softly":"Risky";why=muted?"They sit apart on the wheel, but one is muted, which calms it down.":"These sit awkwardly apart on the colour wheel. Mute one, or put a neutral between them.";}
+    else if(d<150){s=78;label="Triadic";why="Balanced contrast. Keep one colour dominant and the other as the accent.";}
+    else{s=bright?74:90;label="Complementary";why=bright?"Opposites at full strength: very bold. Great for festive wear; keep the proportions uneven.":"Opposites on the colour wheel make each other pop.";}
+    if(dL<6&&d>=18&&bright){s-=6;why+=" Similar brightness makes the edge between them buzz a little.";}
+  }
+  return{score:clamp(Math.round(s),0,100),label,why};
+}
+
+function suggestions(hex){
+  const {L,C,h}=toLch(hex);
+  const mk=(dh,cf=1,Lx=L)=>fromLch(clamp(Lx,12,94),Math.max(C*cf,0),(h+dh+360)%360);
+  if(C<14){
+    // A neutral: suggest accents that contrast in lightness
+    const acc=["#D4A017","#0F6E82","#7A1F2B","#D1287A","#1F8A5B","#2A52BE","#E86A1C","#9CAF88"];
+    return[{t:"Accents",s:"A neutral goes with almost anything. These stand out against it.",c:acc.sort((x,y)=>Math.abs(toLch(y).L-L)-Math.abs(toLch(x).L-L)).slice(0,6)},
+           {t:"Other neutrals",s:"For a quiet, polished look.",c:NEUTRALS.filter(n=>Math.abs(toLch(n).L-L)>18).slice(0,6)}];
+  }
+  // Accent colours read best at mid lightness: lift very dark bases, deepen very light ones.
+  const Cs=Math.max(C,45), aL=L<35?62:L>85?58:L, alt=aL>55?aL-24:aL+24;
+  const at=(Lx,Cx,dh)=>fromLch(clamp(Lx,12,94),Cx,(h+dh+360)%360);
+  const uniq=a=>a.filter((x,i)=>a.findIndex(y=>nameOf(y)===nameOf(x))===i);
+  return[
+    {t:"Complementary",s:"Opposite on the wheel. Maximum pop.",c:uniq([at(aL,Math.max(Cs,55),180),at(aL,Cs*.55,180),at(alt,Cs*.8,180)])},
+    {t:"Analogous",s:"Neighbours. Smooth and easy.",c:uniq([at(L,Cs,30),at(L,Cs,-30),at(aL,Cs*.7,30),at(aL,Cs*.7,-30)]).slice(0,3)},
+    {t:"Triadic",s:"A third of the wheel away. Balanced and playful.",c:uniq([at(aL,Cs*.85,120),at(aL,Cs*.85,-120)])},
+    {t:"Split complementary",s:"Softer than complementary, still lively.",c:uniq([at(aL,Cs*.8,150),at(aL,Cs*.8,210)])},
+    {t:"Tone on tone",s:"The same colour, lighter or deeper.",c:[fromLch(clamp(L+25,12,94),C*.6,h),fromLch(clamp(L-25,12,94),C,h)]},
+    {t:"Neutrals",s:"Safe partners.",c:NEUTRALS.slice().sort((x,y)=>Math.abs(toLch(y).L-L)-Math.abs(toLch(x).L-L)).slice(0,4)}
+  ];
+}
+
+/* Dominant colours: k-means in Lab on a downscaled image */
+function dominant(ctx,w,h,k=6){
+  const img=ctx.getImageData(0,0,w,h).data,pts=[];
+  const step=Math.max(1,Math.floor(Math.sqrt(w*h/5000)));
+  for(let y=0;y<h;y+=step)for(let x=0;x<w;x+=step){const i=(y*w+x)*4;pts.push(rgbToLab(img[i],img[i+1],img[i+2]));}
+  if(!pts.length)return[];
+  // k-means++ style seeding (deterministic: farthest point)
+  const cen=[pts[Math.floor(pts.length/2)]];
+  while(cen.length<k){let best=null,bd=-1;for(let i=0;i<pts.length;i+=3){const d=Math.min(...cen.map(c=>dE(c,pts[i])));if(d>bd){bd=d;best=pts[i];}}cen.push(best);}
+  let asg=new Array(pts.length).fill(0);
+  for(let it=0;it<12;it++){
+    for(let i=0;i<pts.length;i++){let bi=0,bd=1e9;for(let c=0;c<k;c++){const d=dE(cen[c],pts[i]);if(d<bd){bd=d;bi=c;}}asg[i]=bi;}
+    const sum=cen.map(()=>[0,0,0,0]);
+    for(let i=0;i<pts.length;i++){const s=sum[asg[i]];s[0]+=pts[i][0];s[1]+=pts[i][1];s[2]+=pts[i][2];s[3]++;}
+    for(let c=0;c<k;c++)if(sum[c][3])cen[c]=[sum[c][0]/sum[c][3],sum[c][1]/sum[c][3],sum[c][2]/sum[c][3]];
+  }
+  const counts=cen.map(()=>0);asg.forEach(a=>counts[a]++);
+  let cl=cen.map((c,i)=>({lab:c,n:counts[i]})).filter(c=>c.n/pts.length>0.04).sort((a,b)=>b.n-a.n);
+  const merged=[];for(const c of cl){const m=merged.find(x=>dE(x.lab,c.lab)<12);if(m)m.n+=c.n;else merged.push(c);}
+  return merged.slice(0,5).map(c=>{const rgb=labToRgbRaw(...c.lab).map(v=>unlin(clamp(v,0,1)));return{hex:rgbToHex(...rgb),share:c.n/pts.length};});
+}
+function avgAt(ctx,x,y,r){
+  const x0=clamp(Math.round(x-r),0,ctx.canvas.width-1),y0=clamp(Math.round(y-r),0,ctx.canvas.height-1);
+  const w=Math.max(1,Math.min(2*r,ctx.canvas.width-x0)),h=Math.max(1,Math.min(2*r,ctx.canvas.height-y0));
+  const d=ctx.getImageData(x0,y0,w,h).data;let L=0,a=0,b=0,n=0;
+  for(let i=0;i<d.length;i+=4){const l=rgbToLab(d[i],d[i+1],d[i+2]);L+=l[0];a+=l[1];b+=l[2];n++;}
+  const rgb=labToRgbRaw(L/n,a/n,b/n).map(v=>unlin(clamp(v,0,1)));return rgbToHex(...rgb);
+}
+
+
+/* ================= prints (multi-colour pieces) ================= */
+const labOf=h=>rgbToLab(...hexToRgb(h));
+const isNeutral=h=>toLch(h).C<14;
+const lower=s=>s.toLowerCase();
+/* A piece is an ordered list of colours: the first is the main one. */
+function matchPieces(a,b){
+  if(a.length===1&&b.length===1)return match(a[0],b[0]);
+  if(a.length>1&&b.length>1){
+    let best=1e9,shared=null;
+    for(const x of a)for(const y of b){const d=dE(labOf(x),labOf(y));if(d<best){best=d;shared=x;}}
+    if(best<15)return{score:74,label:"Print + print",why:`Two prints linked by the shared ${lower(nameOf(shared))}. Keep everything else plain.`};
+    return{score:46,label:"Busy",why:"Two prints with no colour in common compete for attention. Pair one of them with a solid."};
+  }
+  const P=a.length>1?a:b,S=(a.length>1?b:a)[0];
+  if(isNeutral(S))return{score:90,label:"Print + neutral",why:"A neutral calms the print and lets its colours shine."};
+  let bi=-1,bd=1e9;P.forEach((c,i)=>{const d=dE(labOf(c),labOf(S));if(d<bd){bd=d;bi=i;}});
+  if(bd<16){
+    if(bi===0)return{score:80,label:"Matches the main colour",why:`Same ${lower(nameOf(P[0]))} as the print's main colour. Safe, though echoing a smaller colour from the print is livelier.`};
+    return{score:95,label:"Picks up the print",why:`Echoes the ${lower(nameOf(P[bi]))} in the print, the classic stylist's trick.`};
+  }
+  const main=match(P[0],S).score,rest=P.slice(1).map(c=>match(c,S).score);
+  const avg=rest.length?rest.reduce((x,y)=>x+y,0)/rest.length:main;
+  const score=clamp(Math.round(main*.6+avg*.4)-6,0,100);
+  return score>=70
+    ?{score,label:"Adds a new colour",why:`A new colour that sits well with the print's ${lower(nameOf(P[0]))}. Keep accessories plain.`}
+    :{score,label:"Fights the print",why:"It clashes with the print's colours. Try a colour that's already in the print, or a neutral."};
+}
+function suggestFor(cols){
+  if(cols.length===1)return suggestions(cols[0]);
+  const main=cols[0],{L}=toLch(main);
+  const echo=[];cols.slice(1).forEach(c=>{echo.push(c);const l=toLch(c);echo.push(fromLch(clamp(l.L>55?l.L-18:l.L+18,12,94),l.C*.75,l.h));});
+  const bold=suggestions(main).filter(g=>g.t==="Complementary"||g.t==="Triadic").flatMap(g=>g.c).filter(h=>matchPieces(cols,[h]).score>=66);
+  const groups=[
+    {t:"Pick up a colour from the print",s:"The easiest win: repeat a smaller colour from the print.",c:uniqNames(echo).slice(0,6)},
+    {t:"Calm it with neutrals",s:"Lets the print be the star.",c:NEUTRALS.slice().sort((x,y)=>Math.abs(toLch(y).L-L)-Math.abs(toLch(x).L-L)).slice(0,4)},
+  ];
+  if(bold.length)groups.push({t:"Bold contrast",s:"Opposite to the main colour, still friendly with the rest.",c:uniqNames(bold).slice(0,3)});
+  return groups;
+}
+function uniqNames(a){return a.filter((x,i)=>a.findIndex(y=>nameOf(y)===nameOf(x))===i);}
+/* CSS / SVG fills that show every colour of a print */
+function cssFill(cols){
+  if(cols.length===1)return cols[0];
+  const w=[50,...cols.slice(1).map(()=>50/(cols.length-1))];let at=0;
+  return"linear-gradient(135deg,"+cols.map((c,i)=>{const s=at;at+=w[i];return`${c} ${s}% ${at}%`;}).join(",")+")";
+}
+let patSeq=0;
+function svgFill(cols){
+  if(cols.length===1)return{def:"",fill:cols[0]};
+  const id="pt"+(++patSeq),n=cols.length,sz=8*n+8;let x=0,rects="";
+  cols.forEach((c,i)=>{const w=i===0?16:8;rects+=`<rect x="${x}" y="0" width="${w}" height="${sz}" fill="${c}"/>`;x+=w;});
+  return{def:`<pattern id="${id}" width="${x}" height="${sz}" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">${rects}</pattern>`,fill:`url(#${id})`};
+}
+/* Little outfit illustration: top, bottom and an optional dupatta/scarf */
+function outfitSvg(top,bottom,accent){
+  const T=svgFill(top),B=svgFill(bottom),A=accent?svgFill(accent):null;
+  const st='stroke="#1B1830" stroke-width="2.2" stroke-linejoin="round"';
+  return`<svg viewBox="0 0 120 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>${T.def}${B.def}${A?A.def:""}</defs>
+    <path d="M36 108 L84 108 L91 196 L66 196 L60 134 L54 196 L29 196 Z" fill="${B.fill}" ${st}/>
+    <path d="M42 16 Q60 27 78 16 L104 30 L96 58 L86 54 L88 118 L32 118 L34 54 L24 58 L16 30 Z" fill="${T.fill}" ${st}/>
+    <path d="M50 17 Q60 31 70 17" fill="none" ${st}/>
+    ${A?`<path d="M44 17 Q30 60 40 118 L52 120 Q44 70 55 21 Z" fill="${A.fill}" ${st}/><path d="M76 17 Q92 44 99 64 L90 70 Q82 46 70 21 Z" fill="${A.fill}" ${st}/>`:""}
+  </svg>`;
+}
+
+/* ================= app state ================= */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const N=window.Android||null;
+function toast(t){const e=$("toast");e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,2400);}
+function share(t){if(N)N.share(t);else if(navigator.share)navigator.share({text:t}).catch(()=>{});else toast("Sharing works in the app.");}
+const CATS=["Top","Bottom","Dupatta / scarf","Saree / dress","Footwear","Accessory"];
+const scoreCol=s=>s>=80?"var(--good)":s>=65?"var(--ok)":"var(--bad)";
+let closet=[],looks=[],cur="#0F6E82",domList=[],printOn=false,printCols=[],frozen=false,stream=null,liveTimer=null,curTab="Scan",wCat="All";
+let pair={a:null,b:null};
+
+function store(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(_){toast("Couldn't save on this phone");}}
+function loadAll(){
+  try{closet=JSON.parse(localStorage.getItem("pm-closet")||"null");}catch(_){closet=null;}
+  if(!closet){
+    let old=null;try{old=JSON.parse(localStorage.getItem("pm-wardrobe")||"null");}catch(_){}
+    closet=old?old.map(w=>({id:w.id,name:w.name,cat:w.cat,cols:w.cols||[w.hex],example:w.example})):[
+      {id:"ex1",name:"Navy kurta",cat:"Top",cols:["#1F2A44"],example:true},
+      {id:"ex2",name:"Off-white palazzo",cat:"Bottom",cols:["#EFEBE0"],example:true},
+      {id:"ex3",name:"Mustard dupatta",cat:"Dupatta / scarf",cols:["#D4A017"],example:true},
+      {id:"ex4",name:"Ajrakh print kurta",cat:"Top",cols:["#7A1F2B","#1F2A44","#E3B505"],example:true},
+      {id:"ex5",name:"Blue jeans",cat:"Bottom",cols:["#3B5B8C"],example:true},
+      {id:"ex6",name:"Floral saree",cat:"Saree / dress",cols:["#D1287A","#6E7F3A","#F6C1A3"],example:true}];
+    store("pm-closet",closet);
+  }
+  try{looks=JSON.parse(localStorage.getItem("pm-looks")||"[]");}catch(_){looks=[];}
+}
+
+/* ================= scan ================= */
+const video=$("video"),frozenCv=$("frozen"),fctx=frozenCv.getContext("2d",{willReadFrequently:true});
+const probe=document.createElement("canvas"),pctx=probe.getContext("2d",{willReadFrequently:true});
+async function startCamera(){
+  if(frozen||stream)return;
+  $("stageMsg").hidden=true;$("reticle").hidden=false;
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:960}},audio:false});
+    video.srcObject=stream;await video.play().catch(()=>{});
+    liveTimer=setInterval(sampleLive,220);
+  }catch(e){
+    stream=null;camMsg(e&&e.name==="NotAllowedError"?"Camera access is off. Allow it in Settings › Apps › Huemate › Permissions.":"The camera isn't available here.");
+  }
+}
+function camMsg(t){const m=$("stageMsg");m.hidden=false;$("reticle").hidden=true;m.innerHTML=`<div>${t}</div><button class="pill" onclick="$('file').click()">Choose a photo instead</button>`;}
+function stopCamera(){clearInterval(liveTimer);liveTimer=null;if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}video.srcObject=null;}
+function sampleLive(){
+  if(!video.videoWidth)return;
+  const vw=video.videoWidth,vh=video.videoHeight,s=Math.round(Math.min(vw,vh)*.08);
+  probe.width=s;probe.height=s;pctx.drawImage(video,(vw-s)/2,(vh-s)/2,s,s,0,0,s,s);
+  setCur(avgAt(pctx,s/2,s/2,s/2),false);
+}
+function setFrozen(on){
+  frozen=on;frozenCv.hidden=!on;video.hidden=on;$("reticle").hidden=on;$("marker").hidden=true;
+  $("shutter").hidden=on;$("liveBtn").hidden=!on;$("shutterPad").hidden=on;
+  $("hintText").textContent=on?"Tap the photo to pick an exact spot":"Point at the fabric · daylight is best";
+  $("paletteSec").hidden=!on;$("shareBtn").hidden=!(on&&curTab==="Scan");
+  if(!on){printOn=false;printCols=[];}
+}
+function drawFrozen(src,sw,sh){
+  const sc=Math.min(1,900/Math.max(sw,sh));
+  frozenCv.width=Math.round(sw*sc);frozenCv.height=Math.round(sh*sc);
+  fctx.drawImage(src,0,0,frozenCv.width,frozenCv.height);
+  setFrozen(true);
+  const cw=Math.round(frozenCv.width*.7),ch=Math.round(frozenCv.height*.7);
+  const t=document.createElement("canvas");t.width=160;t.height=Math.max(1,Math.round(160*ch/cw));
+  const tc=t.getContext("2d",{willReadFrequently:true});
+  tc.drawImage(frozenCv,(frozenCv.width-cw)/2,(frozenCv.height-ch)/2,cw,ch,0,0,t.width,t.height);
+  domList=dominant(tc,t.width,t.height);
+  // Several strong colours (not just one colour on a plain background) usually means a print.
+  const strong=domList.filter(d=>d.share>=.1);
+  const chromatic=strong.filter(d=>!isNeutral(d.hex));
+  const looksPrint=chromatic.length>=2||strong.length>=3;
+  printCols=strong.map(d=>d.hex).slice(0,4);
+  printOn=looksPrint&&printCols.length>1;
+  $("printTitle").textContent=looksPrint?"Looks like a print":"Is this a print?";
+  $("printSub").textContent=looksPrint?`We found ${printCols.length} colours. We'll match them together.`:"Turn on if the piece has several colours.";
+  renderPalette();
+  if(domList[0])setCur(domList[0].hex,true);else renderSugg();
+}
+$("shutter").onclick=()=>{if(!video.videoWidth){toast("The camera isn't ready yet");return;}const w=video.videoWidth,h=video.videoHeight;stopCamera();drawFrozen(video,w,h);};
+$("liveBtn").onclick=()=>{setFrozen(false);startCamera();renderSugg();};
+$("photoBtn").onclick=()=>$("file").click();
+$("file").onchange=e=>{
+  const f=e.target.files[0];if(!f)return;const url=URL.createObjectURL(f),img=new Image();
+  img.onload=()=>{stopCamera();$("stageMsg").hidden=true;drawFrozen(img,img.naturalWidth,img.naturalHeight);URL.revokeObjectURL(url);};
+  img.onerror=()=>toast("Couldn't open that image");img.src=url;e.target.value="";
+};
+frozenCv.addEventListener("click",e=>{
+  if(!frozen)return;
+  const r=frozenCv.getBoundingClientRect(),cw=frozenCv.width,ch=frozenCv.height;
+  const sc=Math.min(r.width/cw,r.height/ch),ox=(r.width-cw*sc)/2,oy=(r.height-ch*sc)/2;
+  const x=(e.clientX-r.left-ox)/sc,y=(e.clientY-r.top-oy)/sc;if(x<0||y<0||x>cw||y>ch)return;
+  const hex=avgAt(fctx,x,y,5),m=$("marker");m.hidden=false;m.style.left=(e.clientX-r.left)+"px";m.style.top=(e.clientY-r.top)+"px";m.style.background=hex;
+  printOn=false;setCur(hex,true);
+});
+function renderPalette(){
+  $("palette").innerHTML=domList.map(d=>`<button style="background:${d.hex}" data-hex="${d.hex}" aria-pressed="${!printOn&&d.hex===cur}" aria-label="${esc(nameOf(d.hex))}"><span>${Math.round(d.share*100)}%</span></button>`).join("");
+  $("printToggle").setAttribute("aria-checked",printOn);
+}
+$("palette").addEventListener("click",e=>{const b=e.target.closest("button[data-hex]");if(b){$("marker").hidden=true;printOn=false;setCur(b.dataset.hex,true);}});
+$("printToggle").onclick=()=>{if(printCols.length<2){toast("Only one strong colour found here");return;}printOn=!printOn;renderPalette();renderSugg();updateCurCard();};
+function scanCols(){return printOn&&printCols.length>1?printCols.slice():[cur];}
+function updateCurCard(){
+  const cols=scanCols();
+  $("curSw").style.background=cssFill(cols);
+  $("curName").textContent=cols.length>1?"Print: "+cols.map(nameOf).join(", "):nameOf(cur);
+  $("curHex").textContent=cols.join("  ");
+}
+let lastKey="";
+function setCur(hex,full){
+  cur=hex;
+  for(const b of document.querySelectorAll("#palette button"))b.setAttribute("aria-pressed",!printOn&&b.dataset.hex===hex);
+  $("printToggle").setAttribute("aria-checked",printOn);
+  updateCurCard();
+  const key=full?scanCols().join():nameOf(hex);
+  if(key!==lastKey){lastKey=key;renderSugg();}
+}
+const swHtml=h=>`<button class="sw" data-hex="${h}"><i style="background:${h}"></i><b>${esc(nameOf(h))}</b><small>${h}</small></button>`;
+function renderSugg(){
+  const cols=scanCols();
+  const owned=closet.map(w=>({w,m:matchPieces(cols,w.cols)})).filter(x=>x.m.score>=80).sort((a,b)=>b.m.score-a.m.score).slice(0,3);
+  $("suggSec").innerHTML=`<h2>What goes with ${cols.length>1?"this print":esc(nameOf(cur))}</h2>`+
+    (owned.length?`<div class="note">From your closet: ${owned.map(o=>`<b>${esc(o.w.name)}</b>`).join(", ")}</div>`:"")+
+    suggestFor(cols).map(g=>`<div class="group"><h3>${g.t}</h3><p>${g.s}</p><div class="sugg">${g.c.map(swHtml).join("")}</div></div>`).join("");
+}
+$("suggSec").addEventListener("click",e=>{const b=e.target.closest(".sw");if(b){$("marker").hidden=true;printOn=false;setCur(b.dataset.hex,true);window.scrollTo({top:0,behavior:"smooth"});}});
+$("shareBtn").onclick=()=>share("My colours (Huemate):\n"+domList.map(d=>`${nameOf(d.hex)} ${d.hex}`).join("\n"));
+$("swipeFromScan").onclick=()=>{const cols=scanCols();baseItem={name:cols.length>1?"Scanned print":nameOf(cur),cat:"Top",cols};goTab("Swipe");showSwipe("start");};
+
+/* ================= sheets ================= */
+function openSheet(html,mount){$("sheetHost").innerHTML=`<div class="scrim" id="scrim"></div><div class="sheet" role="dialog"><div class="inner"><div class="grab"></div>${html}</div></div>`;$("scrim").onclick=closeSheet;mount&&mount($("sheetHost").querySelector(".sheet"));}
+function closeSheet(){$("sheetHost").innerHTML="";}
+const isSheet=()=>!!$("sheetHost").innerHTML;
+
+$("saveBtn").onclick=()=>{
+  const options=uniqNames(frozen?[...scanCols(),...domList.map(d=>d.hex)]:[cur]).slice(0,5);
+  const chosen=new Set(scanCols());let cat="Top";
+  openSheet(`<h2>Save to your closet</h2>
+    <div class="field"><label>Colours in this piece</label><div class="colpick" id="cp">${options.map(h=>`<button data-h="${h}" style="background:${h}" aria-pressed="${chosen.has(h)}" aria-label="${esc(nameOf(h))}"></button>`).join("")}</div>
+    <small class="muted">Tap to include or leave out. Pick several for a print; the first one is the main colour.</small></div>
+    <div class="field"><label for="iName">What is it?</label><input type="text" id="iName" maxlength="40" placeholder="e.g. ${esc(lower(nameOf(options[0])))} kurta"></div>
+    <div class="field"><label>Type</label><div class="chips" id="iCat">${CATS.map(c=>`<button class="chip" data-c="${c}" aria-pressed="${c===cat}">${c}</button>`).join("")}</div></div>
+    <button class="btn pop wide" id="iSave">Add to closet</button>`,s=>{
+    s.querySelector("#cp").onclick=e=>{const b=e.target.closest("[data-h]");if(!b)return;const h=b.dataset.h;
+      if(chosen.has(h)){if(chosen.size===1)return;chosen.delete(h);}else chosen.add(h);b.setAttribute("aria-pressed",chosen.has(h));};
+    s.querySelector("#iCat").onclick=e=>{const b=e.target.closest("[data-c]");if(!b)return;cat=b.dataset.c;for(const x of s.querySelectorAll("#iCat .chip"))x.setAttribute("aria-pressed",x===b);};
+    s.querySelector("#iSave").onclick=()=>{
+      const cols=options.filter(h=>chosen.has(h));
+      const name=s.querySelector("#iName").value.trim()||(cols.length>1?`${nameOf(cols[0])} print ${lower(cat.split(" ")[0])}`:`${nameOf(cols[0])} ${lower(cat.split(" ")[0])}`);
+      closet.unshift({id:"w"+Date.now().toString(36),name,cat,cols});store("pm-closet",closet);closeSheet();renderSugg();toast("Added to your closet");
+    };
+  });
+};
+
+/* ================= swipe ================= */
+let baseItem=null,deck=[],di=0,liked=[],history=[],pick=null;
+function roleOf(cat){return cat==="Bottom"?"bottom":(cat==="Dupatta / scarf"||cat==="Accessory"||cat==="Footwear")?"accent":"top";}
+function ensureBase(){if(!baseItem||!baseItem.cols)baseItem=closet[0]?{...closet[0]}:{name:"Navy",cat:"Top",cols:["#1F2A44"]};}
+function renderBase(){
+  ensureBase();
+  $("baseSw").style.background=cssFill(baseItem.cols);$("baseName").textContent=baseItem.name;
+  $("baseSub").textContent=(baseItem.cols.length>1?"Print · ":"")+baseItem.cols.map(nameOf).join(", ");
+}
+function showSwipe(stage){
+  for(const s of["start","deck","likes","final"])$("sw"+s[0].toUpperCase()+s.slice(1)).hidden=s!==stage;
+  if(stage==="start")renderBase();
+}
+function thirdFor(a,b){
+  const pool=uniqNames([...a.slice(1),...b.slice(1),...suggestFor(a).flatMap(g=>g.c),...suggestFor(b).flatMap(g=>g.c)]);
+  let best=null,bs=0;for(const h of pool){const s=Math.min(matchPieces(a,[h]).score,matchPieces(b,[h]).score);if(s>bs){bs=s;best=h;}}
+  return bs>=80?best:null;
+}
+function buildDeck(base){
+  const role=roleOf(base.cat);
+  const cands=[];
+  for(const w of closet){
+    if(w.id&&w.id===base.id)continue;
+    const r=roleOf(w.cat);
+    if(role==="top"&&r==="bottom"||role==="bottom"&&r==="top"||role==="accent"&&r!=="accent")cands.push({name:w.name,cols:w.cols,from:"closet",cat:w.cat});
+  }
+  const word=role==="bottom"?"top":"bottom";
+  for(const h of uniqNames(suggestFor(base.cols).flatMap(g=>g.c)))cands.push({name:`${nameOf(h)} ${word}`,cols:[h],from:"idea"});
+  const seen=new Set();
+  const cards=cands.filter(c=>{const k=c.cols.map(nameOf).join();if(seen.has(k))return false;seen.add(k);return true;}).map(c=>{
+    let top,bottom,accent=null;
+    if(role==="top"){top={name:base.name,cols:base.cols};bottom=c;}
+    else if(role==="bottom"){top=c;bottom={name:base.name,cols:base.cols};}
+    else{top=c;bottom={name:"Off-white bottom",cols:["#EFEBE0"],from:"idea"};accent={name:base.name,cols:base.cols};}
+    const m=matchPieces(top.cols,bottom.cols);
+    return{top,bottom,accent,m};
+  });
+  cards.sort((a,b)=>b.m.score-a.m.score);
+  const strong=cards.filter(c=>c.m.score>=75).slice(0,9),wild=cards.filter(c=>c.m.score<75&&c.m.score>=50).slice(0,3);
+  const out=[];let wi=0;strong.forEach((c,i)=>{out.push(c);if(i%3===2&&wild[wi])out.push(wild[wi++]);});while(wild[wi])out.push(wild[wi++]);
+  // add a dupatta/scarf to every other strong look
+  out.forEach((c,i)=>{if(!c.accent&&i%2===1){const h=thirdFor(c.top.cols,c.bottom.cols);if(h)c.accent={name:`${nameOf(h)} dupatta`,cols:[h],from:"idea"};}});
+  return out.slice(0,12);
+}
+function pieceLine(p,label){return`<span><i style="background:${cssFill(p.cols)}"></i><b>${esc(p.name)}</b>${p.from==="idea"?' <small class="muted">· try this colour</small>':p.from==="closet"?' <small class="muted">· yours</small>':""}</span>`;}
+function cardHtml(c,cls){
+  return`<div class="scard ${cls||""}"><div class="fig">${outfitSvg(c.top.cols,c.bottom.cols,c.accent&&c.accent.cols)}<span class="stamp like">LOVE</span><span class="stamp nope">SKIP</span></div>
+    <div class="meta"><div class="tagrow"><span class="tag score">${c.m.score}</span><span class="tag">${esc(c.m.label)}</span></div>
+    <div class="pieces">${pieceLine(c.top)}${pieceLine(c.bottom)}${c.accent?pieceLine(c.accent):""}</div>
+    <p class="why">${esc(c.m.why)}</p></div></div>`;
+}
+function renderDeck(){
+  $("deckCount").textContent=`${Math.min(di+1,deck.length)} / ${deck.length}`;
+  $("deckBar").style.width=(di/deck.length*100)+"%";
+  $("undoBtn").disabled=!history.length;
+  const d=$("deck");
+  if(di>=deck.length){showLikes();return;}
+  d.innerHTML=(deck[di+1]?cardHtml(deck[di+1],"back"):"")+cardHtml(deck[di]);
+  attachDrag(d.lastElementChild);
+}
+$("startSwipe").onclick=()=>{
+  ensureBase();deck=buildDeck(baseItem);di=0;liked=[];history=[];
+  if(!deck.length){toast("Add a few pieces to your closet first");return;}
+  $("deckTitle").textContent="Styling: "+baseItem.name;showSwipe("deck");renderDeck();
+};
+function decide(like,el){
+  if(di>=deck.length)return;
+  const card=el||$("deck").lastElementChild;
+  history.push({di,like});if(like)liked.push(deck[di]);
+  if(card){card.style.transition="transform .3s ease, opacity .3s";card.style.transform=`translateX(${like?"":"-"}140%) rotate(${like?18:-18}deg)`;card.style.opacity="0";}
+  di++;setTimeout(renderDeck,card?260:0);
+}
+$("likeBtn").onclick=()=>decide(true);
+$("nopeBtn").onclick=()=>decide(false);
+$("undoBtn").onclick=()=>{const h=history.pop();if(!h)return;di=h.di;if(h.like)liked.pop();renderDeck();};
+function attachDrag(el){
+  let x0=0,y0=0,dx=0,drag=false;
+  const like=el.querySelector(".stamp.like"),nope=el.querySelector(".stamp.nope");
+  el.addEventListener("pointerdown",e=>{drag=true;x0=e.clientX;y0=e.clientY;dx=0;el.setPointerCapture(e.pointerId);el.style.transition="none";});
+  el.addEventListener("pointermove",e=>{if(!drag)return;dx=e.clientX-x0;const dy=(e.clientY-y0)*.2;
+    el.style.transform=`translate(${dx}px,${dy}px) rotate(${dx/18}deg)`;like.style.opacity=clamp(dx/100,0,1);nope.style.opacity=clamp(-dx/100,0,1);});
+  const end=()=>{if(!drag)return;drag=false;
+    if(Math.abs(dx)>90)decide(dx>0,el);
+    else{el.style.transition="transform .2s ease";el.style.transform="";like.style.opacity=0;nope.style.opacity=0;}};
+  el.addEventListener("pointerup",end);el.addEventListener("pointercancel",end);
+}
+function miniHtml(c,i,pressed){return`<button class="mini" data-i="${i}" aria-pressed="${pressed}"><div class="fig">${outfitSvg(c.top.cols,c.bottom.cols,c.accent&&c.accent.cols)}</div><div class="t"><span class="tag score" style="font-size:11px">${c.m.score}</span> ${esc(c.bottom.name===baseItem.name?c.top.name:c.bottom.name)}</div></button>`;}
+function showLikes(){
+  showSwipe("likes");pick=null;$("finalBtn").disabled=true;
+  if(!liked.length){$("likesTitle").textContent="No favourites this round";$("likesSub").textContent="Try a new set, or style a different piece.";$("likesGrid").innerHTML="";$("finalBtn").hidden=true;return;}
+  $("finalBtn").hidden=false;
+  if(liked.length===1){pick=0;showFinal();return;}
+  $("likesTitle").textContent=`You loved ${liked.length} looks`;$("likesSub").textContent="Tap one to make it your final pick.";
+  const order=liked.map((c,i)=>i).sort((a,b)=>liked[b].m.score-liked[a].m.score);
+  $("likesGrid").innerHTML=order.map(i=>miniHtml(liked[i],i,false)).join("");
+}
+$("likesGrid").addEventListener("click",e=>{const b=e.target.closest(".mini");if(!b)return;pick=+b.dataset.i;for(const x of document.querySelectorAll("#likesGrid .mini"))x.setAttribute("aria-pressed",x===b);$("finalBtn").disabled=false;});
+$("finalBtn").onclick=()=>{if(pick!=null)showFinal();};
+$("againBtn").onclick=()=>{$("startSwipe").click();};
+function lookText(c){return`My outfit (Huemate):\n${[c.top,c.bottom,c.accent].filter(Boolean).map(p=>`• ${p.name}: ${p.cols.map(h=>nameOf(h)+" "+h).join(", ")}`).join("\n")}\nScore ${c.m.score}/100 · ${c.m.label}`;}
+function showFinal(){
+  const c=liked[pick];showSwipe("final");
+  $("finalCard").innerHTML=`<div class="fig">${outfitSvg(c.top.cols,c.bottom.cols,c.accent&&c.accent.cols)}</div><div class="meta"><div class="tagrow"><span class="tag score">${c.m.score} / 100</span><span class="tag">${esc(c.m.label)}</span></div><div class="scard" style="position:static;border:0;box-shadow:none"><div class="pieces" style="padding:0">${pieceLine(c.top)}${pieceLine(c.bottom)}${c.accent?pieceLine(c.accent):""}</div></div><p class="hand">${esc(c.m.why)}</p></div>`;
+  $("saveLook").disabled=false;$("saveLook").textContent="Save look";
+}
+$("saveLook").onclick=()=>{const c=liked[pick];looks.unshift({id:"l"+Date.now().toString(36),top:c.top,bottom:c.bottom,accent:c.accent,m:c.m,ts:Date.now()});store("pm-looks",looks);$("saveLook").disabled=true;$("saveLook").textContent="Saved to Closet";};
+$("shareLook").onclick=()=>share(lookText(liked[pick]));
+$("restartBtn").onclick=()=>showSwipe("start");
+$("baseBtn").onclick=()=>pickPiece("What are you styling?",p=>{baseItem=p;renderBase();});
+
+/* piece picker shared by Swipe and Pair */
+function pickPiece(title,done){
+  openSheet(`<h2>${title}</h2><div class="list">${closet.map(w=>`<button class="card li" data-id="${w.id}"><span class="chipsw" style="background:${cssFill(w.cols)}"></span><div class="t"><b>${esc(w.name)}</b><small>${esc(w.cat)}${w.cols.length>1?" · print":""}</small></div></button>`).join("")}</div>
+    <button class="btn wide" id="ppScan">Use what I last scanned</button>
+    <div class="row"><label for="cc" style="font-weight:800">Or any colour</label><span class="spacer"></span><input type="color" id="cc" value="#1f2a44"><button class="btn pop small" id="ccUse">Use</button></div>`,s=>{
+    s.querySelector(".list").onclick=e=>{const b=e.target.closest("[data-id]");if(!b)return;const w=closet.find(x=>x.id===b.dataset.id);closeSheet();done({...w});};
+    s.querySelector("#ppScan").onclick=()=>{const cols=scanCols();closeSheet();done({name:cols.length>1?"Scanned print":nameOf(cur),cat:"Top",cols});};
+    s.querySelector("#ccUse").onclick=()=>{const h=s.querySelector("#cc").value.toUpperCase();closeSheet();done({name:nameOf(h),cat:"Top",cols:[h]});};
+  });
+}
+
+/* ================= closet ================= */
+function renderCloset(){
+  $("looksWrap").hidden=!looks.length;
+  $("looks").innerHTML=looks.map(l=>`<button class="look" data-l="${l.id}"><div class="fig">${outfitSvg(l.top.cols,l.bottom.cols,l.accent&&l.accent.cols)}</div><small><b>${l.m.score}</b> · ${esc(l.m.label)}</small></button>`).join("");
+  const cats=["All",...CATS.filter(c=>closet.some(w=>w.cat===c))];if(!cats.includes(wCat))wCat="All";
+  $("wFilter").innerHTML=cats.length>2?cats.map(c=>`<button class="chip" data-c="${c}" aria-pressed="${c===wCat}">${c}</button>`).join(""):"";
+  $("wCount").textContent=`${closet.length} piece${closet.length===1?"":"s"}`;
+  const list=closet.filter(w=>wCat==="All"||w.cat===wCat);
+  $("wGrid").innerHTML=list.length?list.map(w=>`<button class="item" data-id="${w.id}"><i style="background:${cssFill(w.cols)}">${w.example?"<em>Example</em>":""}</i><b>${esc(w.name)}</b><small>${esc(w.cat)} · ${w.cols.length>1?w.cols.length+" colours":esc(nameOf(w.cols[0]))}</small></button>`).join(""):`<div class="empty">Nothing here yet. Scan something and tap Save.</div>`;
+}
+$("wFilter").addEventListener("click",e=>{const b=e.target.closest("[data-c]");if(b){wCat=b.dataset.c;renderCloset();}});
+$("wGrid").addEventListener("click",e=>{const b=e.target.closest(".item");if(b)openItem(b.dataset.id);});
+$("looks").addEventListener("click",e=>{
+  const b=e.target.closest("[data-l]");if(!b)return;const l=looks.find(x=>x.id===b.dataset.l);let arm=false;
+  openSheet(`<div class="card final"><div class="fig" style="height:260px">${outfitSvg(l.top.cols,l.bottom.cols,l.accent&&l.accent.cols)}</div><div class="meta"><div class="tagrow"><span class="tag score">${l.m.score} / 100</span><span class="tag">${esc(l.m.label)}</span></div><div class="scard" style="position:static;border:0;box-shadow:none"><div class="pieces">${pieceLine(l.top)}${pieceLine(l.bottom)}${l.accent?pieceLine(l.accent):""}</div></div></div></div>
+    <div class="row"><button class="btn" id="lDel" style="flex:1">Delete</button><button class="btn pop" id="lShare" style="flex:1">Share</button></div>`,s=>{
+    s.querySelector("#lShare").onclick=()=>share(lookText(l));
+    s.querySelector("#lDel").onclick=e=>{if(!arm){arm=true;e.target.textContent="Tap again to delete";return;}looks=looks.filter(x=>x.id!==l.id);store("pm-looks",looks);closeSheet();renderCloset();};
+  });
+});
+function openItem(id){
+  const it=closet.find(w=>w.id===id);if(!it)return;let arm=false;
+  const ranked=closet.filter(w=>w.id!==id).map(w=>({w,m:matchPieces(it.cols,w.cols)})).sort((a,b)=>b.m.score-a.m.score);
+  const buy=uniqNames(suggestFor(it.cols).flatMap(g=>g.c.slice(0,2))).slice(0,4);
+  openSheet(`<div class="row"><span class="bigsw" style="background:${cssFill(it.cols)}"></span><div style="flex:1;min-width:0"><h2>${esc(it.name)}</h2><div class="muted">${esc(it.cat)} · ${it.cols.map(h=>esc(nameOf(h))).join(", ")}</div></div></div>
+    <button class="btn pop wide" id="itSwipe">Swipe outfits for this</button>
+    <h3>Goes best with</h3>
+    <div class="list">${ranked.length?ranked.slice(0,6).map(r=>`<button class="card li" data-pair="${r.w.id}"><span class="chipsw" style="background:${cssFill(r.w.cols)}"></span><div class="t"><b>${esc(r.w.name)}</b><small>${esc(r.m.label)}</small></div><span class="s" style="color:${scoreCol(r.m.score)}">${r.m.score}</span></button>`).join(""):'<p class="muted">Add more pieces to see pairings.</p>'}</div>
+    <h3>Colours to look for when shopping</h3><div class="sugg">${buy.map(swHtml).join("")}</div>
+    <button class="btn wide" id="delBtn">Remove from closet</button>`,s=>{
+    s.querySelector("#itSwipe").onclick=()=>{baseItem={...it};closeSheet();goTab("Swipe");showSwipe("start");};
+    s.querySelector(".list").onclick=e=>{const b=e.target.closest("[data-pair]");if(!b)return;pair={a:it.cat==="Bottom"?b.dataset.pair:id,b:it.cat==="Bottom"?id:b.dataset.pair};closeSheet();goTab("Pair");};
+    s.querySelector("#delBtn").onclick=e=>{if(!arm){arm=true;e.target.textContent="Tap again to remove";return;}closet=closet.filter(w=>w.id!==id);store("pm-closet",closet);closeSheet();renderCloset();toast("Removed");};
+  });
+}
+
+/* ================= pair ================= */
+let pairCustom={};
+function slot(k){if(pairCustom[k])return pairCustom[k];return closet.find(w=>w.id===pair[k])||null;}
+function renderPair(){
+  if(!slot("a")){const t=closet.find(w=>w.cat==="Top")||closet[0];pair.a=t&&t.id;}
+  if(!slot("b")){const t=closet.find(w=>w.cat==="Bottom"&&w.id!==pair.a)||closet.find(w=>w.id!==pair.a);pair.b=t&&t.id;}
+  const A=slot("a")||{name:"Navy",cols:["#1F2A44"]},B=slot("b")||{name:"Off-white",cols:["#EFEBE0"]};
+  $("aSw").style.background=cssFill(A.cols);$("aName").textContent=A.name;$("bSw").style.background=cssFill(B.cols);$("bName").textContent=B.name;
+  $("pFig").innerHTML=outfitSvg(A.cols,B.cols);
+  const m=matchPieces(A.cols,B.cols);
+  $("pScore").textContent=m.score;$("pScore").style.color=scoreCol(m.score);$("pLabel").textContent=m.label;$("pWhy").textContent=m.why;
+  const third=thirdFor(A.cols,B.cols);
+  $("pTip").innerHTML=third?`<b>Add a third piece:</b> a ${esc(lower(nameOf(third)))} <span class="mono">${third}</span> dupatta or accessory works with both.`:"Keep accessories neutral with this pair.";
+}
+document.querySelector(".slots").addEventListener("click",e=>{
+  const b=e.target.closest(".slot");if(!b)return;const k=b.dataset.slot;
+  pickPiece(k==="a"?"Choose the top":"Choose the bottom",p=>{if(p.id){pair[k]=p.id;delete pairCustom[k];}else pairCustom[k]=p;renderPair();});
+});
+$("swapBtn").onclick=()=>{pair={a:pair.b,b:pair.a};pairCustom={a:pairCustom.b,b:pairCustom.a};if(!pairCustom.a)delete pairCustom.a;if(!pairCustom.b)delete pairCustom.b;renderPair();};
+
+/* ================= tabs & boot ================= */
+document.querySelector("nav.tabs").addEventListener("click",e=>{const b=e.target.closest("button");if(b)goTab(b.dataset.tab);});
+function goTab(t){
+  curTab=t;closeSheet();
+  for(const x of document.querySelectorAll("nav.tabs button"))x.setAttribute("aria-selected",x.dataset.tab===t);
+  for(const v of["Scan","Swipe","Closet","Pair"])$("v"+v).hidden=v!==t;
+  $("shareBtn").hidden=!(t==="Scan"&&frozen);
+  if(t==="Scan"){if(!frozen)startCamera();}else stopCamera();
+  if(t==="Swipe"&&!$("swStart").hidden)renderBase();
+  if(t==="Closet")renderCloset();
+  if(t==="Pair")renderPair();
+  window.scrollTo(0,0);
+}
+window.onBack=()=>{
+  if(isSheet()){closeSheet();return true;}
+  if(curTab==="Swipe"&&$("swStart").hidden){showSwipe("start");return true;}
+  if(curTab!=="Scan"){goTab("Scan");return true;}
+  if(frozen){setFrozen(false);startCamera();renderSugg();return true;}
+  return false;
+};
+document.addEventListener("visibilitychange",()=>{if(document.hidden)stopCamera();else if(curTab==="Scan"&&!frozen)startCamera();});
+
+loadAll();setCur(cur,true);showSwipe("start");
+if(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)startCamera();else camMsg("The camera isn't available here.");
+
+</script>
+</body>
+</html>
